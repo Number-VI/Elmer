@@ -93,8 +93,6 @@ Inside, it's the same JSON as before — one entry per slot, plus settings:
 
 ## Remote consoles (vSphere, RDP, VNC)
 
-These work, with two things to know.
-
 **Tick "Slow"** in the bottom bar if keystrokes go missing. A remote console
 relays every keystroke to the guest over the network, and a burst sent at full
 speed can overrun it. Slow mode types one key at a time (~12ms apart) — still
