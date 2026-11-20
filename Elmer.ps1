@@ -286,8 +286,10 @@ $SLOT_COUNT  = 12
 # (~92px of glyphs) plus the chip's 16px padding and 10px right margin.
 $CHIP_WIDTH  = 130
 $LABEL_WIDTH = 170
+$EYE_WIDTH   = 44    # per-row show/hide toggle, including its left gap
+$SLOW_WIDTH  = 44    # per-row Slow toggle, including its left gap
 
-# Per-key pause in "Slow" mode. Roughly a fast human typist; slow enough for a
+# Per-key pause for a slot whose Slow (turtle) toggle is on. Roughly a fast human typist; slow enough for a
 # remote console to relay each keystroke to the guest.
 $SLOW_DELAY_MS = 12
 
@@ -366,9 +368,10 @@ $xaml = @'
       </Style.Triggers>
     </Style>
 
-    <!-- Eye icon. Drawn as vector paths rather than an icon font, so it cannot
-         turn into a missing-glyph box. Unchecked = hidden = plain eye ("click
-         to reveal"); checked = revealed = struck-through eye ("click to hide"). -->
+    <!-- Per-row eye icon. Drawn as vector paths rather than an icon font, so it
+         cannot turn into a missing-glyph box. Unchecked = hidden = plain eye
+         ("click to reveal"); checked = revealed = struck-through eye ("click to
+         hide"). Icon only, so it fits beside every snippet field. -->
     <Style x:Key="EyeToggle" TargetType="ToggleButton">
       <Setter Property="Foreground" Value="#FFE6E6F0"/>
       <Setter Property="Background" Value="#FF2A2A38"/>
@@ -379,9 +382,9 @@ $xaml = @'
         <Setter.Value>
           <ControlTemplate TargetType="ToggleButton">
             <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                    CornerRadius="6" Padding="12,6">
-              <StackPanel Orientation="Horizontal">
-                <Viewbox Width="17" Height="17" VerticalAlignment="Center">
+                    CornerRadius="6" Padding="8,6">
+                <Viewbox Width="17" Height="17" VerticalAlignment="Center"
+                         HorizontalAlignment="Center">
                   <Canvas Width="24" Height="24">
                     <Path x:Name="Lid" Stroke="#FFE6E6F0" StrokeThickness="1.6"
                           Data="M 2,12 C 5,6.5 8.5,4 12,4 C 15.5,4 19,6.5 22,12 C 19,17.5 15.5,20 12,20 C 8.5,20 5,17.5 2,12 Z"/>
@@ -392,18 +395,55 @@ $xaml = @'
                           Visibility="Collapsed" Data="M 3.5,3.5 L 20.5,20.5"/>
                   </Canvas>
                 </Viewbox>
-                <TextBlock x:Name="Lbl" Text="Show" Margin="8,0,0,0"
-                           VerticalAlignment="Center"
-                           Foreground="{TemplateBinding Foreground}"/>
-              </StackPanel>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsChecked" Value="True">
                 <Setter TargetName="Slash" Property="Visibility" Value="Visible"/>
-                <Setter TargetName="Lbl" Property="Text" Value="Hide"/>
               </Trigger>
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="Bd" Property="Background" Value="#FF3A3A4C"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Per-row Slow toggle: a turtle, same shape and size as EyeToggle. It is a
+         setting rather than an action, so "on" fills the button with the accent
+         colour instead of changing the icon. -->
+    <Style x:Key="SlowToggle" TargetType="ToggleButton">
+      <Setter Property="Background" Value="#FF2A2A38"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                    CornerRadius="6" Padding="8,6">
+                <Viewbox Width="17" Height="17" VerticalAlignment="Center"
+                         HorizontalAlignment="Center">
+                  <Canvas Width="24" Height="24">
+                    <!-- shell, head, legs and tail -->
+                    <Path Stroke="#FFE6E6F0" StrokeThickness="1.6" StrokeLineJoin="Round"
+                          Data="M 3,15 C 3,9.5 6.5,7 10.5,7 C 14.5,7 18,9.5 18,15 Z"/>
+                    <Path Stroke="#FFE6E6F0" StrokeThickness="1.2"
+                          Data="M 10.5,7 L 10.5,15 M 4.2,11 L 16.8,11"/>
+                    <Path Fill="#FFE6E6F0"
+                          Data="M 18.6,12.5 A 2,2 0 1 0 22.6,12.5 A 2,2 0 1 0 18.6,12.5 Z"/>
+                    <Path Stroke="#FFE6E6F0" StrokeThickness="1.6"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Data="M 6,15 L 5,18.5 M 15,15 L 16,18.5 M 3,15 L 1.5,16.5"/>
+                  </Canvas>
+                </Viewbox>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="#FF3A3A4C"/>
+              </Trigger>
+              <!-- After IsMouseOver, so "on" stays visible while hovered. -->
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="#FF7C6CF0"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -466,13 +506,15 @@ $xaml = @'
                  FontSize="12" Foreground="#FF7A7A95" Margin="0,4,0,0" TextWrapping="Wrap"/>
     </StackPanel>
 
-    <!-- Column widths track $CHIP_WIDTH / $LABEL_WIDTH; the 8px right margin
+    <!-- Column widths track $CHIP_WIDTH / $LABEL_WIDTH / $EYE_WIDTH / $SLOW_WIDTH; the 8px right margin
          matches the ScrollViewer padding below so headers line up with rows. -->
     <Grid x:Name="HeaderRow" DockPanel.Dock="Top" Margin="0,0,8,6">
       <Grid.ColumnDefinitions>
         <ColumnDefinition x:Name="HeaderChipCol"/>
         <ColumnDefinition x:Name="HeaderLabelCol"/>
         <ColumnDefinition Width="*"/>
+        <ColumnDefinition x:Name="HeaderEyeCol"/>
+        <ColumnDefinition x:Name="HeaderSlowCol"/>
       </Grid.ColumnDefinitions>
       <TextBlock Grid.Column="0" Text="SHORTCUT" Style="{StaticResource ColumnHeader}"/>
       <TextBlock Grid.Column="1" Text="LABEL" Style="{StaticResource ColumnHeader}"/>
@@ -489,11 +531,6 @@ $xaml = @'
                    Foreground="#FF7A7A95" FontSize="12" VerticalAlignment="Center"
                    Margin="0,0,12,0" TextWrapping="Wrap"/>
         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-          <CheckBox x:Name="SlowBox" Content="Slow" Foreground="#FF9A9AB8" FontSize="12"
-                    VerticalAlignment="Center" Margin="0,0,14,0"
-                    ToolTip="Type one key at a time. Use for remote consoles (vSphere, RDP, VNC) that drop a fast burst of keystrokes."/>
-          <ToggleButton x:Name="ShowButton" Style="{StaticResource EyeToggle}" Margin="0,0,8,0"
-                        ToolTip="Show or hide the snippet text. Snippets are hidden whenever Elmer starts."/>
           <Button x:Name="ClearButton" Content="Clear all" Style="{StaticResource Action}" Margin="0,0,8,0"/>
           <Button x:Name="SaveButton" Content="Save" Style="{StaticResource Action}"/>
         </StackPanel>
@@ -514,25 +551,29 @@ $rowsPanel   = $window.FindName('RowsPanel')
 $statusText  = $window.FindName('StatusText')
 $saveButton  = $window.FindName('SaveButton')
 $clearButton = $window.FindName('ClearButton')
-$slowBox     = $window.FindName('SlowBox')
-$showButton  = $window.FindName('ShowButton')
 
 $fieldStyle  = $window.FindResource('Field')
 $maskedStyle = $window.FindResource('FieldMasked')
 $chipStyle   = $window.FindResource('Chip')
 $chipText    = $window.FindResource('ChipText')
+$eyeStyle    = $window.FindResource('EyeToggle')
+$slowStyle   = $window.FindResource('SlowToggle')
 
 # Keep the header columns in step with the rows built below.
 $window.FindName('HeaderChipCol').Width  = New-Object System.Windows.GridLength $CHIP_WIDTH
 $window.FindName('HeaderLabelCol').Width = New-Object System.Windows.GridLength $LABEL_WIDTH
+$window.FindName('HeaderEyeCol').Width   = New-Object System.Windows.GridLength $EYE_WIDTH
+$window.FindName('HeaderSlowCol').Width  = New-Object System.Windows.GridLength $SLOW_WIDTH
 
-# Build the 12 rows: shortcut chip | label | snippet.
+# Build the 12 rows: shortcut chip | label | snippet | eye toggle | slow toggle.
 # Each snippet cell holds a PasswordBox and a TextBox on top of each other; the
-# eye toggle decides which one is visible. Whichever is visible is the live
-# value, so the two are synced whenever the toggle flips.
+# row's own eye toggle decides which one is visible. Whichever is visible is the
+# live value, so the two are synced whenever that toggle flips.
 $boxes = New-Object 'System.Collections.Generic.List[System.Windows.Controls.TextBox]'
 $masks = New-Object 'System.Collections.Generic.List[System.Windows.Controls.PasswordBox]'
 $notes = New-Object 'System.Collections.Generic.List[System.Windows.Controls.TextBox]'
+$eyes  = New-Object 'System.Collections.Generic.List[System.Windows.Controls.Primitives.ToggleButton]'
+$slows = New-Object 'System.Collections.Generic.List[System.Windows.Controls.Primitives.ToggleButton]'
 for ($i = 1; $i -le $SLOT_COUNT; $i++) {
     $grid = New-Object System.Windows.Controls.Grid
     $grid.Margin = New-Object System.Windows.Thickness 0, 0, 0, 8
@@ -545,7 +586,13 @@ for ($i = 1; $i -le $SLOT_COUNT; $i++) {
     $c3.Width = New-Object System.Windows.GridLength 1, ([System.Windows.GridUnitType]::Star)
     $grid.ColumnDefinitions.Add($c1)
     $grid.ColumnDefinitions.Add($c2)
+    $c4 = New-Object System.Windows.Controls.ColumnDefinition
+    $c4.Width = New-Object System.Windows.GridLength $EYE_WIDTH
     $grid.ColumnDefinitions.Add($c3)
+    $c5 = New-Object System.Windows.Controls.ColumnDefinition
+    $c5.Width = New-Object System.Windows.GridLength $SLOW_WIDTH
+    $grid.ColumnDefinitions.Add($c4)
+    $grid.ColumnDefinitions.Add($c5)
 
     $chip = New-Object System.Windows.Controls.Border
     $chip.Style = $chipStyle
@@ -578,19 +625,38 @@ for ($i = 1; $i -le $SLOT_COUNT; $i++) {
     [System.Windows.Controls.Grid]::SetColumn($box, 2)
     $grid.Children.Add($box) | Out-Null
 
+    # Tag is the zero-based slot index, read back in the shared click handler.
+    $eye = New-Object System.Windows.Controls.Primitives.ToggleButton
+    $eye.Style = $eyeStyle
+    $eye.Tag = $i - 1
+    $eye.Margin = New-Object System.Windows.Thickness 8, 0, 0, 0
+    $eye.ToolTip = "Show or hide snippet F$i. Snippets are hidden whenever Elmer starts."
+    [System.Windows.Controls.Grid]::SetColumn($eye, 3)
+    $grid.Children.Add($eye) | Out-Null
+
+    $slow = New-Object System.Windows.Controls.Primitives.ToggleButton
+    $slow.Style = $slowStyle
+    $slow.Margin = New-Object System.Windows.Thickness 8, 0, 0, 0
+    $slow.ToolTip = "Slow: type F$i one key at a time. Use for remote consoles (vSphere, RDP, VNC) that drop a fast burst of keystrokes."
+    [System.Windows.Controls.Grid]::SetColumn($slow, 4)
+    $grid.Children.Add($slow) | Out-Null
+
     $rowsPanel.Children.Add($grid) | Out-Null
     $boxes.Add($box)
     $masks.Add($mask)
     $notes.Add($note)
+    $eyes.Add($eye)
+    $slows.Add($slow)
 }
 
 # --- Masking -----------------------------------------------------------------
 
-$script:Revealed = $false
+# One flag per slot: each row reveals independently.
+$script:Revealed = New-Object 'bool[]' $SLOT_COUNT
 
 function Get-SlotText {
     param([int]$Index)
-    if ($script:Revealed) { return $boxes[$Index].Text }
+    if ($script:Revealed[$Index]) { return $boxes[$Index].Text }
     return $masks[$Index].Password
 }
 
@@ -601,22 +667,22 @@ function Set-SlotText {
 }
 
 function Set-Revealed {
-    param([bool]$On)
-    for ($i = 0; $i -lt $SLOT_COUNT; $i++) {
-        # Copy from whichever control was live before the flip.
-        if ($On) { $boxes[$i].Text = $masks[$i].Password }
-        else     { $masks[$i].Password = $boxes[$i].Text }
+    param([int]$Index, [bool]$On)
+    if ($script:Revealed[$Index] -eq $On) { return }
 
-        if ($On) {
-            $boxes[$i].Visibility = [System.Windows.Visibility]::Visible
-            $masks[$i].Visibility = [System.Windows.Visibility]::Collapsed
-        }
-        else {
-            $boxes[$i].Visibility = [System.Windows.Visibility]::Collapsed
-            $masks[$i].Visibility = [System.Windows.Visibility]::Visible
-        }
+    # Copy from whichever control was live before the flip.
+    if ($On) { $boxes[$Index].Text = $masks[$Index].Password }
+    else     { $masks[$Index].Password = $boxes[$Index].Text }
+
+    if ($On) {
+        $boxes[$Index].Visibility = [System.Windows.Visibility]::Visible
+        $masks[$Index].Visibility = [System.Windows.Visibility]::Collapsed
     }
-    $script:Revealed = $On
+    else {
+        $boxes[$Index].Visibility = [System.Windows.Visibility]::Collapsed
+        $masks[$Index].Visibility = [System.Windows.Visibility]::Visible
+    }
+    $script:Revealed[$Index] = $On
 }
 
 # --- Snippet persistence ----------------------------------------------------
@@ -659,15 +725,17 @@ function Unprotect-Json {
     finally { [Array]::Clear($bytes, 0, $bytes.Length) }
 }
 
-# A slot is stored as { "note": ..., "text": ... }. Files written before labels
-# existed hold a bare string per slot, which still loads as the snippet text.
+# A slot is stored as { "note": ..., "text": ..., "slow": ... }. Files written
+# before labels existed hold a bare string per slot, which still loads as the
+# snippet text. Files written before Slow was per slot hold one settings.slow
+# flag, which applies to every slot that has no slow of its own.
 function Read-Saved {
     param($Saved)
 
     if ($Saved.PSObject.Properties.Name -contains 'settings') {
         $s = $Saved.settings
         if ($null -ne $s -and $s.PSObject.Properties.Name -contains 'slow') {
-            $slowBox.IsChecked = [bool]$s.slow
+            foreach ($t in $slows) { $t.IsChecked = [bool]$s.slow }
         }
     }
 
@@ -689,6 +757,9 @@ function Read-Saved {
         }
         if ($fields -contains 'note' -and $null -ne $value.note) {
             $notes[$i].Text = [string]$value.note
+        }
+        if ($fields -contains 'slow' -and $null -ne $value.slow) {
+            $slows[$i].IsChecked = [bool]$value.slow
         }
     }
 }
@@ -734,9 +805,9 @@ function Save-Snippets {
         $data["F$($i + 1)"] = [ordered]@{
             note = $notes[$i].Text
             text = Get-SlotText $i
+            slow = [bool]$slows[$i].IsChecked
         }
     }
-    $data['settings'] = [ordered]@{ slow = [bool]$slowBox.IsChecked }
     try {
         $json = $data | ConvertTo-Json -Depth 3
         Set-Content -Path $script:StoreFile -Value (Protect-Json $json) -Encoding UTF8
@@ -788,7 +859,7 @@ $typeTimer.add_Tick({
     }
 
     $delay = 0
-    if ($slowBox.IsChecked) { $delay = $SLOW_DELAY_MS }
+    if ($slows[$slot - 1].IsChecked) { $delay = $SLOW_DELAY_MS }
 
     $r = [Typer]::TypeText($text, $delay)
     if (-not $r.Ok) {
@@ -834,7 +905,13 @@ $clearButton.add_Click({
     Set-Status "Cleared. Press Save to write that to disk."
 })
 
-$showButton.add_Click({ Set-Revealed ([bool]$showButton.IsChecked) })
+# One handler for every row's eye; the sender's Tag says which slot it is.
+foreach ($eye in $eyes) {
+    $eye.add_Click({
+        param($sender, $e)
+        Set-Revealed ([int]$sender.Tag) ([bool]$sender.IsChecked)
+    })
+}
 
 $window.add_SourceInitialized({
     $script:OwnHwnd = (New-Object System.Windows.Interop.WindowInteropHelper $window).Handle
